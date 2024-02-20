@@ -27,6 +27,4 @@
       <Filter>Resource Files</Filter>
     </Image>
   </ItemGroup>
-  <None Include=".gitignore" />
-  <None Include="README.md" />
 </Project>

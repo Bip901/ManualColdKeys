@@ -9,6 +9,7 @@ struct HotKey {
 	int virtualKey; //Get key codes from https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
 	int modifiers[8]; // e.g. VK_SHIFT, VK_CONTROL, VK_MENU, VK_LWIN...
 	LPWSTR fileToLaunch; //e.g. foo.exe or bar.lnk
+	LPWSTR arguments; //May be NULL
 };
 
 
@@ -33,12 +34,14 @@ static HotKey hotkeys [] = {
 	HotKey {
 		0x54, // "T" Key
 		{ VK_CONTROL, VK_MENU },
-		HEAP_LPWSTR(R"(C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Windows Terminal\Terminal.lnk)")
+		HEAP_LPWSTR(R"(C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Windows Terminal\Terminal.lnk)"),
+		HEAP_LPWSTR(R"(-d "C:\Foo")") //Start Windows Terminal at a specific directory!
 	},
 	HotKey {
 		0x43, // "C" Key
 		{ VK_LWIN },
-		HEAP_LPWSTR(R"(C:\Program Files (x86)\Google\Chrome\Application\chrome.exe)")
+		HEAP_LPWSTR(R"(C:\Program Files (x86)\Google\Chrome\Application\chrome.exe)"),
+		NULL
 	},
 };
 
@@ -95,7 +98,7 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 			if (index >= 0 && index < sizeof(hotkeys) / sizeof(HotKey))
 			{
 				HotKey hotkey = hotkeys[index];
-				ShellExecute(NULL, L"open", hotkey.fileToLaunch, NULL, NULL, SW_SHOWDEFAULT);
+				ShellExecute(NULL, L"open", hotkey.fileToLaunch, hotkey.arguments, NULL, SW_SHOWDEFAULT);
 				// Alternative way without a shell (no .lnk file suppoprt though):
 				/*
 				STARTUPINFO si = {};
