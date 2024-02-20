@@ -68,7 +68,7 @@ static LRESULT CALLBACK HookProc(int code, WPARAM wParam, LPARAM lParam)
 							break;
 						}
 					}
-					if (modifiers_matching && PostMessage(NULL, WM_USER - i, 0, 0) != 0)
+					if (modifiers_matching && PostMessage(NULL, WM_HOTKEY_ACTIVATED_0 + i, 0, 0) != 0)
 					{
 						return 1; //Success; Block key event from other processes
 					}
