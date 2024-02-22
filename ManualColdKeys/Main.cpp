@@ -98,17 +98,22 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 			if (index >= 0 && index < sizeof(hotkeys) / sizeof(HotKey))
 			{
 				HotKey hotkey = hotkeys[index];
-				ShellExecute(NULL, L"open", hotkey.fileToLaunch, hotkey.arguments, NULL, SW_SHOWDEFAULT);
-				// Alternative way without a shell (no .lnk file suppoprt though):
-				/*
-				STARTUPINFO si = {};
-				si.cb = sizeof(si);
-				PROCESS_INFORMATION pi = {};
-				if (CreateProcess(NULL, hotkey.commandline, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
+				SHELLEXECUTEINFOW info = { };
+				info.cbSize = sizeof(info);
+				info.lpVerb = L"open";
+				info.lpFile = hotkey.fileToLaunch;
+				info.lpParameters = hotkey.arguments;
+				info.fMask = SEE_MASK_NOCLOSEPROCESS;
+				info.nShow = SW_SHOWNORMAL;
+				if (ShellExecuteEx(&info))
 				{
-					CloseHandle(pi.hProcess);
-					CloseHandle(pi.hThread);
-				}*/
+					HANDLE processHandle = info.hProcess;
+					if (processHandle)
+					{
+						AllowSetForegroundWindow(GetProcessId(processHandle));
+						CloseHandle(processHandle);
+					}
+				}
 			}
 		}
 	}
