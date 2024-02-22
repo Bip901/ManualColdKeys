@@ -111,6 +111,17 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 					if (processHandle)
 					{
 						AllowSetForegroundWindow(GetProcessId(processHandle));
+						bool stop = false;
+						EnumWindows([](HWND hwnd, LPARAM cookie) -> BOOL {
+							bool* stopPtr = (bool*)cookie;
+							if (!*stopPtr)
+							{
+								SetForegroundWindow(hwnd);
+								SetActiveWindow(hwnd);
+								*stopPtr = true;
+								return true;
+							}
+						}, (LPARAM)&stop);
 						CloseHandle(processHandle);
 					}
 				}
