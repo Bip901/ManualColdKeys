@@ -10,6 +10,7 @@ struct HotKey {
 	int modifiers[8]; // e.g. VK_SHIFT, VK_CONTROL, VK_MENU, VK_LWIN...
 	LPWSTR fileToLaunch; //e.g. foo.exe or bar.lnk
 	LPWSTR arguments; //May be NULL
+	bool allowSetForegroundWindow;
 };
 
 
@@ -35,17 +36,22 @@ static HotKey hotkeys [] = {
 		0x54, // "T" Key
 		{ VK_CONTROL, VK_MENU },
 		HEAP_LPWSTR(R"(C:\ProgramData\Microsoft\Windows\Start Menu\Programs\Windows Terminal\Terminal.lnk)"),
-		HEAP_LPWSTR(R"(-d "C:\Foo")") //Start Windows Terminal at a specific directory!
+		HEAP_LPWSTR(R"(-d "C:\Foo")"), //Start Windows Terminal at a specific directory!
+		false,
 	},
 	HotKey {
 		0x43, // "C" Key
 		{ VK_LWIN },
 		HEAP_LPWSTR(R"(C:\Program Files (x86)\Google\Chrome\Application\chrome.exe)"),
-		NULL
+		NULL,
+		true,
 	},
 };
 
 #define WM_HOTKEY_ACTIVATED_0 (WM_USER + 64)
+
+const TCHAR FAKE_WINDOW_NAME[] = TEXT("FakeWindow");
+static HWND fakeWindow = NULL;
 
 static LRESULT CALLBACK HookProc(int code, WPARAM wParam, LPARAM lParam)
 {
@@ -83,8 +89,42 @@ static LRESULT CALLBACK HookProc(int code, WPARAM wParam, LPARAM lParam)
 	return CallNextHookEx(NULL, code, wParam, lParam);
 }
 
+static HWND CreateFakeWindow(HINSTANCE hInstance)
+{
+	WNDCLASS wc = {};
+	wc.lpfnWndProc = DefWindowProc;
+	wc.hInstance = hInstance;
+	wc.lpszClassName = FAKE_WINDOW_NAME;
+	RegisterClass(&wc);
+	return CreateWindowEx(0, FAKE_WINDOW_NAME, FAKE_WINDOW_NAME, WS_OVERLAPPEDWINDOW, 0, 0, 0, 0, NULL, NULL, hInstance, NULL);
+}
+
+/// <summary>
+/// Like AllowSetForegroundWindow, but works even if this process shouldn't have that permission.
+/// </summary>
+static void ForceAllowSetForegroundWindow(DWORD pid, HINSTANCE myHInstance)
+{
+	HWND foregroundWindow = GetForegroundWindow();
+	if (foregroundWindow == NULL) //If no foreground window, AllowSetForegroundWindow should work
+	{
+		AllowSetForegroundWindow(pid);
+	}
+	else
+	{
+		if (fakeWindow == NULL)
+			fakeWindow = CreateFakeWindow(myHInstance);
+		DWORD thisThreadId = GetCurrentThreadId();
+		DWORD foregroundThreadId = GetWindowThreadProcessId(foregroundWindow, NULL);
+		AttachThreadInput(thisThreadId, foregroundThreadId, true);
+		SetForegroundWindow(fakeWindow);
+		AllowSetForegroundWindow(pid);
+		AttachThreadInput(thisThreadId, foregroundThreadId, false);
+	}
+}
+
 int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ int nShowCmd)
 {
+	HWND fakeWindow = CreateFakeWindow(hInstance);
 	SetWindowsHookEx(WH_KEYBOARD_LL, HookProc, hInstance, 0);
 	tray_init();
 	MSG msg = { };
@@ -111,8 +151,11 @@ int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
 					if (processHandle)
 					{
 						DWORD newProcessPid = GetProcessId(processHandle);
-						AllowSetForegroundWindow(newProcessPid);
 						CloseHandle(processHandle);
+						if (hotkey.allowSetForegroundWindow)
+						{
+							ForceAllowSetForegroundWindow(newProcessPid, hInstance);
+						}
 					}
 				}
 			}
